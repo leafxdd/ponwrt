@@ -49,7 +49,7 @@ endef
 
 define Package/mihomo/install
 	$(call GoPackage/Package/Install/Bin,$(1))
-	$(STAGING_DIR_HOST)/bin/upx --lzma --best $(1)/usr/libexec/mihomo
+	$(STAGING_DIR_HOSTPKG)/bin/upx --lzma --best $(1)/usr/libexec/mihomo
 endef
 
 define Build/Prepare

@@ -20,7 +20,9 @@ reports the PLL frequency as unavailable and refuses overclocking.
 
 Copied from [fw876/helloworld](https://github.com/fw876/helloworld)
 (commit `c39f1e350105f5fc6445506f03363c5bfa44273b`) with `PKG_MIRROR_HASH`
-recomputed. helloworld hashes the tarball Lean's tree generates from the git
+recomputed, and upx taken from `$(STAGING_DIR_HOSTPKG)`, where the packages
+feed installs it (Lean's tree builds upx under `tools/`).
+helloworld hashes the tarball Lean's tree generates from the git
 checkout, while PonWrt generates it with `git archive`, so helloworld's hash
 never matches here. Packages in `package/` take precedence over feeds, so
 `./scripts/feeds install -a` skips the helloworld copy.
