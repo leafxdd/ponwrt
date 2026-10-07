@@ -1,7 +1,7 @@
 # package/lean
 
-Packages imported from Lean's trees that the feeds PonWrt uses do not provide
-in a usable form.
+Packages from Lean's trees, or the ones QWRT ships, that the feeds PonWrt
+uses do not provide in a usable form.
 
 LuCI packages from [coolsnowwolf/luci](https://github.com/coolsnowwolf/luci)
 (branch `openwrt-25.12`, commit `2fa3f68a78e875fee86d9f9d55e38641834db225`):
@@ -15,6 +15,22 @@ LuCI packages from [coolsnowwolf/luci](https://github.com/coolsnowwolf/luci)
 `luci-app-airoha-npu` reads and programs the CPU PLL through `devmem`. PonWrt
 builds without `CONFIG_DEVMEM` and the busybox `devmem` applet, so the page
 reports the PLL frequency as unavailable and refuses overclocking.
+
+## luci-app-xupnpd
+
+From [jarod360/luci-app-xupnpd](https://github.com/jarod360/luci-app-xupnpd)
+(commit `4afbcc53ae6cdde1527548172f3e502107eef539`, Apache-2.0 per its
+Makefile header), the same code QWRT ships. Local changes:
+
+- No `/etc/init.d/xupnpd` of its own: it would collide with the one the
+  xupnpd package installs, which apk refuses. `/etc/init.d/xupnpd-luci`
+  instead enables/starts or disables/stops the stock xupnpd service from
+  the `enabled` option, at boot and on every `xupnpd` config change.
+- Depend on `luci-compat` for the Lua CBI page and add an rpcd ACL.
+- Translations moved to `po/zh_Hans`, where `luci.mk` looks for them.
+- No bundled ISP-specific `iptv.m3u` and no uci-defaults script; dropped the
+  unused "Broadcast for LAN Only" option. Clearing the playlist text box
+  now empties the playlist.
 
 ## mihomo
 

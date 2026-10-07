@@ -1,0 +1,32 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "XUPNPD IPTV"
+msgstr "XUPNPD IPTV"
+
+msgid "XUPNPD IPTV Config"
+msgstr "XUPNPD IPTV 设置"
+
+msgid "XUPNPD for IPTV DLNA Service"
+msgstr "XUPNPD IPTV DLNA 服务。可以在电视/手机/PC/盒子上直接观看 IPTV（建议配合 udpxy 或 msd_lite 使用）"
+
+msgid "Basic Setting"
+msgstr "基本设置"
+
+msgid "Enable"
+msgstr "启用"
+
+msgid "IPTV M3U List"
+msgstr "IPTV M3U 列表"
+
+msgid "Stream URLs must point at the router, e.g. through udpxy or msd_lite."
+msgstr "频道地址需指向路由器，例如通过 udpxy 或 msd_lite 转发的地址。"
+
+msgid "RUNNING"
+msgstr "运行中"
+
+msgid "NOT RUNNING"
+msgstr "未运行"
+
+msgid "Open Web Interface"
+msgstr "打开 Web 界面"
