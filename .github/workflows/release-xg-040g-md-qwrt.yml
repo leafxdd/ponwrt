@@ -1,0 +1,164 @@
+name: Release XG-040G-MD (QWRT feature set)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag
+        required: true
+        type: string
+      prerelease:
+        description: Mark as prerelease
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-xg-040g-md-qwrt-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+
+    steps:
+      # Runs before the build dependencies are installed: large-packages also
+      # removes the preinstalled llvm, which the next apt-get puts back.
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@ceedf095f4ec1a097402bc6bd80831f2e1a6fde6 # v2.0.0
+        with:
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: false
+
+      - uses: actions/checkout@v6
+
+      - name: Move the build tree to the larger disk
+        run: |
+          df -h / /mnt || true
+          root_free=$(df --output=avail -k / | tail -1)
+          mnt_free=$(df --output=avail -k /mnt 2>/dev/null | tail -1)
+          if [ "${mnt_free:-0}" -gt "$root_free" ]; then
+            sudo mkdir -p /mnt/ponwrt
+            sudo chown "$(id -u):$(id -g)" /mnt/ponwrt
+            cp -a "$GITHUB_WORKSPACE/." /mnt/ponwrt/
+            echo "BUILD_ROOT=/mnt/ponwrt" >> "$GITHUB_ENV"
+          else
+            echo "BUILD_ROOT=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+          fi
+
+      - name: Install build dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            asciidoc autoconf automake autopoint binutils bison build-essential \
+            bzip2 ccache clang cmake cpio curl device-tree-compiler flex gawk \
+            gettext git g++-multilib gcc-multilib gperf help2man intltool \
+            libelf-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev \
+            libmpfr-dev libncurses-dev libpython3-dev libreadline-dev libssl-dev \
+            libtool libyaml-dev lld llvm ninja-build p7zip-full patch pkgconf \
+            python3 python3-docutils python3-pip python3-ply python3-pyelftools \
+            qemu-utils re2c rsync scons squashfs-tools subversion swig texinfo \
+            uglifyjs unzip wget xmlto xxd zlib1g-dev zstd
+
+      - name: Cache downloads
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.BUILD_ROOT }}/dl
+          key: ponwrt-dl-xg-040g-md-qwrt-${{ hashFiles('feeds.conf.default', 'configs/*.config') }}
+          restore-keys: |
+            ponwrt-dl-xg-040g-md-qwrt-
+            ponwrt-dl-an7581-
+
+      - name: Install feeds
+        working-directory: ${{ env.BUILD_ROOT }}
+        run: |
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Load repository signing key
+        working-directory: ${{ env.BUILD_ROOT }}
+        env:
+          PONWRT_APK_PRIVATE_KEY: ${{ secrets.PONWRT_APK_PRIVATE_KEY }}
+        run: |
+          if [ -n "$PONWRT_APK_PRIVATE_KEY" ]; then
+            umask 077
+            printf '%s\n' "$PONWRT_APK_PRIVATE_KEY" > private-key.pem
+            openssl ec -in private-key.pem -pubout -out public-key.pem
+          fi
+
+      # AUTOREMOVE deletes each build directory once its package is built,
+      # which keeps the Rust, Go and kernel trees from piling up on disk.
+      - name: Configure
+        working-directory: ${{ env.BUILD_ROOT }}
+        run: |
+          printf 'CONFIG_AUTOREMOVE=y\n' > ci.config
+          ./scripts/kconfig.pl + + + \
+            configs/an7581.config \
+            configs/release.config \
+            configs/xg-040g-md-qwrt.config \
+            ci.config > .config
+          make defconfig
+          grep -x 'CONFIG_AUTOREMOVE=y' .config
+
+      - name: Download sources
+        working-directory: ${{ env.BUILD_ROOT }}
+        run: make download -j"$(nproc)"
+
+      - name: Build
+        working-directory: ${{ env.BUILD_ROOT }}
+        run: |
+          df -h .
+          make -j"$(nproc)" BUILD_LOG=1
+          df -h .
+
+      - name: Upload build logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: ${{ env.BUILD_ROOT }}/logs
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Collect firmware
+        working-directory: ${{ env.BUILD_ROOT }}
+        run: |
+          out=bin/targets/airoha/an7581
+          mkdir -p "$GITHUB_WORKSPACE/release"
+          cp "$out"/*nokia_xg-040g-md-ubi*.itb "$GITHUB_WORKSPACE/release/"
+          cp "$out"/*.manifest "$GITHUB_WORKSPACE/release/" 2>/dev/null || true
+          cp "$out"/config.buildinfo "$GITHUB_WORKSPACE/release/"
+          cd "$GITHUB_WORKSPACE/release"
+          sha256sum * > sha256sums
+          ls -l
+
+      - name: Create GitHub release
+        working-directory: ${{ github.workspace }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          args=(
+            "$RELEASE_TAG"
+            release/*
+            --repo "$GITHUB_REPOSITORY"
+            --target "$GITHUB_SHA"
+            --title "PonWrt $RELEASE_TAG (Nokia XG-040G-MD, QWRT feature set)"
+            --notes "Nokia XG-040G-MD (UBI) firmware built from configs/an7581.config, configs/release.config and configs/xg-040g-md-qwrt.config at $GITHUB_SHA. Back up the bosa and ri UBI volumes before flashing."
+          )
+          if [ "$PRERELEASE" = "true" ]; then
+            args+=(--prerelease)
+          fi
+          gh release create "${args[@]}"
