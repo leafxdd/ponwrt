@@ -1,0 +1,132 @@
+Subject: [PATCH] firewall4: add Broadcom fullcone mode
+
+Based on coolsnowwolf/lede's 002-firewall4-add-brcm-fullcone-mode.patch.
+
+With fullcone enabled, brcm_fullcone '1' (or fullcone '2', which is how
+Lean's firewall4 selects it) adds the Broadcom fullcone flag to the IPv4
+masquerade rule instead of the fullcone expressions. fullcone stays an
+on/off option, so LuCI's "Enable FullCone NAT" checkbox keeps working.
+If nft rejects the flag, the fullcone expressions are used instead.
+
+--- a/root/usr/share/firewall4/templates/ruleset.uc
++++ b/root/usr/share/firewall4/templates/ruleset.uc
+@@ -327,7 +327,7 @@ table inet fw4 {
+ {%   for (let redirect in fw4.redirects(`dstnat_${zone.name}`)): %}
+ 		{%+ include("redirect.uc", { fw4, zone, redirect }) %}
+ {%   endfor %}
+-{%   if (zone.masq && fw4.default_option("fullcone")): %}
++{%   if (zone.masq && fw4.default_option("fullcone") == 1): %}
+ 		{%+ include("zone-fullcone.uc", { fw4, zone, family: 4, direction: "dstnat" }) %}
+ {%   endif %}
+ {%   if (zone.masq6 && fw4.default_option("fullcone6")): %}
+@@ -343,10 +343,10 @@ table inet fw4 {
+ {%   for (let redirect in fw4.redirects(`srcnat_${zone.name}`)): %}
+ 		{%+ include("redirect.uc", { fw4, zone, redirect }) %}
+ {%   endfor %}
+-{%   if (zone.masq && !fw4.default_option("fullcone")): %}
++{%   if (zone.masq && fw4.default_option("fullcone") != 1): %}
+ {%    for (let saddrs in zone.masq4_src_subnets): %}
+ {%     for (let daddrs in zone.masq4_dest_subnets): %}
+-		{%+ include("zone-masq.uc", { fw4, zone, family: 4, saddrs, daddrs }) %}
++		{%+ include("zone-masq.uc", { fw4, zone, family: 4, saddrs, daddrs, fullcone: fw4.default_option("fullcone") == 2 }) %}
+ {%     endfor %}
+ {%    endfor %}
+ {%   endif %}
+@@ -357,7 +357,7 @@ table inet fw4 {
+ {%     endfor %}
+ {%    endfor %}
+ {%   endif %}
+-{%   if (zone.masq && fw4.default_option("fullcone")): %}
++{%   if (zone.masq && fw4.default_option("fullcone") == 1): %}
+ 		{%+ include("zone-fullcone.uc", { fw4, zone, family: 4, direction: "srcnat" }) %}
+ {%   endif %}
+ {%   if (zone.masq6 && fw4.default_option("fullcone6")): %}
+--- a/root/usr/share/firewall4/templates/zone-masq.uc
++++ b/root/usr/share/firewall4/templates/zone-masq.uc
+@@ -10,4 +10,4 @@ meta nfproto {{ fw4.nfproto(family) }} {
+ 	{{ fw4.ipproto(family) }} daddr != {{ fw4.set(map(daddrs[1], fw4.cidr)) }} {%+ endif -%}
+ {%+ for (let a in (daddrs ? daddrs[2] : [])): -%}
+ 	{{ fw4.ipproto(family) }} daddr & {{ a.mask }} {{ a.invert ? '!=' : '==' }} {{ a.addr }} {%+ endfor -%}
+-masquerade comment "!fw4: Masquerade {{ fw4.nfproto(family, true) }} {{ zone.name }} traffic"
++masquerade{% if (fullcone): %} fullcone{% endif %} comment "!fw4: Masquerade{% if (fullcone): %} (Fullcone){% endif %} {{ fw4.nfproto(family, true) }} {{ zone.name }} traffic"
+--- a/root/usr/share/ucode/fw4.uc
++++ b/root/usr/share/ucode/fw4.uc
+@@ -510,6 +510,21 @@ function nft_try_fullcone() {
+ 	return ok;
+ }
+ 
++function nft_try_masq_fullcone() {
++	let nft_test =
++		'add table inet fw4-masq-fullcone-test; ' +
++		'add chain inet fw4-masq-fullcone-test srcnat { ' +
++			'type nat hook postrouting priority -100; policy accept; ' +
++			'meta nfproto ipv4 masquerade fullcone; ' +
++		'}; ';
++	let cmd = sprintf("/usr/sbin/nft -c '%s' 2>/dev/null", replace(nft_test, "'", "'\\''"));
++	let ok = system(cmd) == 0;
++	if (!ok) {
++		warn("nft_try_masq_fullcone: cmd "+ cmd + "\n");
++	}
++	return ok;
++}
++
+ 
+ return {
+ 	read_kernel_version: function() {
+@@ -1137,6 +1152,10 @@ return {
+ 			return null;
+ 	},
+ 
++	parse_fullcone: function(val) {
++		return (val == "2") ? 2 : this.parse_bool(val);
++	},
++
+ 	parse_family: function(val) {
+ 		if (val == 'any' || val == 'all' || val == '*')
+ 			return 0;
+@@ -2031,8 +2050,9 @@ return {
+ 		}
+ 
+ 		let defs = this.parse_options(data, {
+-			fullcone: [ "bool", "0" ],
++			fullcone: [ "fullcone", "0" ],
+ 			fullcone6: [ "bool", "0" ],
++			brcm_fullcone: [ "bool", "0" ],
+ 			input: [ "policy", "drop" ],
+ 			output: [ "policy", "drop" ],
+ 			forward: [ "policy", "drop" ],
+@@ -2067,7 +2087,20 @@ return {
+ 
+ 		delete defs.syn_flood;
+ 
+-		if (!nft_try_fullcone()) {
++		/* From here on, fullcone 1 means the fullcone expression and 2 the
++		 * Broadcom fullcone flag on IPv4 masquerade.
++		 */
++		if (defs.fullcone === true)
++			defs.fullcone = defs.brcm_fullcone ? 2 : 1;
++		else if (defs.fullcone !== 2)
++			defs.fullcone = 0;
++
++		if (defs.fullcone == 2 && !nft_try_masq_fullcone()) {
++			defs.fullcone = 1;
++			warn("nft_try_masq_fullcone failed, use the fullcone expression instead\n");
++		}
++
++		if (defs.fullcone == 1 && !nft_try_fullcone()) {
+ 			delete defs.fullcone;
+ 			warn("nft_try_fullcone failed, disable fullcone globally\n");
+ 		}
+@@ -2299,9 +2332,11 @@ return {
+ 
+ 		if (zone.masq) {
+ 			zone.dflags.snat = true;
+-			if (this.state.defaults.fullcone) {
++			if (this.state.defaults.fullcone == 1) {
+ 				zone.dflags.dnat = true;
+ 				this.myinfo_section(data, "IPv4 fullcone enabled for zone '" + zone.name + "'");
++			} else if (this.state.defaults.fullcone == 2) {
++				this.myinfo_section(data, "IPv4 brcm fullcone enabled for zone '" + zone.name + "'");
+ 			}
+ 		}
+ 

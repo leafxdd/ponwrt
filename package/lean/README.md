@@ -9,7 +9,7 @@ LuCI packages from [coolsnowwolf/luci](https://github.com/coolsnowwolf/luci)
 | Package | Upstream path | Local changes |
 |---|---|---|
 | luci-app-airoha-npu | `applications/luci-app-airoha-npu` | `luci.mk` include path; dropped README screenshots |
-| luci-app-turboacc | `applications/luci-app-turboacc` | `luci.mk` include path; firewall4/nftables flow offloading only (drop iptables, fast-classifier and shortcut-fe engines); depend on `luci-lua-runtime` and `luci-lib-jsonc` for the Lua rpcd backend; detect `nft_flow_offload.ko` and `nft_fullcone.ko`; offer fullcone as on/off because firewall4 parses it as a boolean |
+| luci-app-turboacc | `applications/luci-app-turboacc` | `luci.mk` include path; firewall4/nftables flow offloading only (drop iptables, fast-classifier and shortcut-fe engines); depend on `luci-lua-runtime` and `luci-lib-jsonc` for the Lua rpcd backend; detect `nft_flow_offload.ko` and `nft_fullcone.ko`; fullcone mode 2 (Broadcom) sets firewall4's `brcm_fullcone`, see below |
 | luci-theme-design | `themes/luci-theme-design` | `luci.mk` include path |
 
 `luci-app-airoha-npu` reads and programs the CPU PLL through `devmem`, which
@@ -59,3 +59,28 @@ refresh the hash as a regular user:
 
     make package/lean/mihomo/download PKG_MIRROR_HASH=skip
     make package/lean/mihomo/check FIXUP=1
+
+## Broadcom fullcone NAT
+
+turboacc's "Broadcom Fullcone NAT1" mode, ported from
+[coolsnowwolf/lede](https://github.com/coolsnowwolf/lede) (commit
+`0bf8f083b1c6b55770d1bb71e6a5402ee90e35cb`). It lives outside this
+directory:
+
+| Path | Source |
+|---|---|
+| `target/linux/generic/hack-6.18/982-add-bcm-fullconenat-support.patch`, `983-add-bcm-fullconenat-to-nft.patch`, `985-netfilter-bcm-fullcone-reserve-expectation-early.patch` | Lean, unchanged |
+| `target/linux/generic/hack-6.18/986-netfilter-bcm-fullcone-do-not-unregister-helper.patch` | local: 982 unregisters a helper that was never registered, which crashes when `nft_masq` is unloaded |
+| `package/libs/libnftnl/patches/002-libnftnl-add-masquerade-fullcone-flag.patch`, `package/network/utils/nftables/patches/103-nftables-add-masquerade-fullcone-flag.patch`, `104-fix-fullcone-json-parsing.patch` | Lean, unchanged; 104 also fixes a crash parsing JSON `redirect` statements |
+| `package/network/config/firewall4/patches/002-firewall4-add-brcm-fullcone-mode.patch` | Lean's, but selected with `brcm_fullcone '1'` next to `fullcone '1'` (Lean's `fullcone '2'` also works), because LuCI's firewall page shows fullcone as a checkbox and would reset `2` to off |
+| `package/kernel/linux/files/sysctl-nf-conntrack.conf` | `nf_conntrack_expect_max=16384`, as in Lean's tree |
+
+The kernel puts a `BCM-NAT` helper on the first conntrack of each IPv4 UDP
+mapping and keeps the mapping open through a conntrack expectation:
+
+- Only IPv4 UDP is covered. TCP and IPv6 are masqueraded as usual.
+- Conntracks with a helper are never flow offloaded, so the first
+  connection of each mapping stays on the CPU path. Later connections that
+  reuse the mapping, and inbound ones, can still be offloaded.
+- With 985, a new UDP flow is dropped when the expectation table is full,
+  hence the larger `nf_conntrack_expect_max`.

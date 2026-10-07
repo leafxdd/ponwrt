@@ -136,9 +136,16 @@ start_service() {
 	uci -q set "firewall.@defaults[0].flow_offloading"="$flow_offloading"
 	uci -q set "firewall.@defaults[0].flow_offloading_hw"="$flow_offloading_hw"
 
+	# firewall4 keeps fullcone as on/off; brcm_fullcone selects Broadcom fullcone.
 	local fullcone
 	config_get "fullcone" "config" "fullcone" "0"
-	uci -q set "firewall.@defaults[0].fullcone"="$fullcone"
+	if [ "$fullcone" = "2" ]; then
+		uci -q set "firewall.@defaults[0].fullcone"="1"
+		uci -q set "firewall.@defaults[0].brcm_fullcone"="1"
+	else
+		uci -q set "firewall.@defaults[0].fullcone"="$fullcone"
+		uci -q delete "firewall.@defaults[0].brcm_fullcone"
+	fi
 
 	local tcpcca
 	config_get "tcpcca" "config" "tcpcca" "cubic"

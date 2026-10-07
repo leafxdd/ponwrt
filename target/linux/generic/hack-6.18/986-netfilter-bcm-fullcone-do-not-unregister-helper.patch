@@ -1,0 +1,17 @@
+Subject: [PATCH] netfilter: bcm fullcone: do not unregister the BCM-NAT helper
+
+The BCM-NAT helper is assigned to conntracks directly and is never
+passed to nf_conntrack_helper_register(), so its list node is not
+hashed. Unregistering it dereferences a NULL pprev, which crashes the
+kernel when nft_masq or xt_MASQUERADE is unloaded.
+
+--- a/net/netfilter/nf_nat_masquerade.c
++++ b/net/netfilter/nf_nat_masquerade.c
+@@ -560,7 +560,6 @@ EXPORT_SYMBOL_GPL(nf_nat_masquerade_inet
+ 
+ void nf_nat_masquerade_inet_unregister_notifiers(void)
+ {
+-       nf_conntrack_helper_unregister(&nf_conntrack_helper_bcm_nat);
+ 	mutex_lock(&masq_mutex);
+ 	/* check if the notifiers still have clients */
+ 	if (--masq_refcnt > 0)
