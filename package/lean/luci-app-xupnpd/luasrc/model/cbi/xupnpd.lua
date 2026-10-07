@@ -25,13 +25,21 @@ function config.cfgvalue(self, section)
 	return nixio.fs.readfile(playlist)
 end
 
+-- xupnpd only rereads its playlists on SIGUSR1 (playlists_update_interval
+-- is 0), and editing the playlist changes no UCI option to restart it.
+local function reload_playlists()
+	luci.sys.call("killall -USR1 xupnpd >/dev/null 2>&1")
+end
+
 function config.write(self, section, value)
 	value = value:gsub("\r\n?", "\n")
 	nixio.fs.writefile(playlist, value)
+	reload_playlists()
 end
 
 function config.remove(self, section)
 	nixio.fs.writefile(playlist, "")
+	reload_playlists()
 end
 
 return m

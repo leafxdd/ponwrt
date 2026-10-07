@@ -30,7 +30,8 @@ Makefile header), the same code QWRT ships. Local changes:
 - Translations moved to `po/zh_Hans`, where `luci.mk` looks for them.
 - No bundled ISP-specific `iptv.m3u` and no uci-defaults script; dropped the
   unused "Broadcast for LAN Only" option. Clearing the playlist text box
-  now empties the playlist.
+  now empties the playlist, and saving it sends xupnpd SIGUSR1 so the new
+  list is picked up without a restart.
 
 ## mihomo
 
