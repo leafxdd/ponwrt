@@ -9,7 +9,7 @@ LuCI packages from [coolsnowwolf/luci](https://github.com/coolsnowwolf/luci)
 | Package | Upstream path | Local changes |
 |---|---|---|
 | luci-app-airoha-npu | `applications/luci-app-airoha-npu` | `luci.mk` include path; dropped README screenshots |
-| luci-app-turboacc | `applications/luci-app-turboacc` | `luci.mk` include path; firewall4/nftables flow offloading only (drop iptables, fast-classifier and shortcut-fe engines); depend on `luci-lua-runtime` and `luci-lib-jsonc` for the Lua rpcd backend; detect `nft_flow_offload.ko` and `nft_fullcone.ko`; fullcone mode 2 (Broadcom) sets firewall4's `brcm_fullcone`, see below |
+| luci-app-turboacc | `applications/luci-app-turboacc` | `luci.mk` include path; firewall4/nftables flow offloading only (drop iptables, fast-classifier and shortcut-fe engines); depend on `luci-lua-runtime` and `luci-lib-jsonc` for the Lua rpcd backend; detect `nft_flow_offload.ko` and `nft_fullcone.ko`; fullcone mode 2 (Broadcom) sets firewall4's `brcm_fullcone`, see below; uci-defaults turns packet steering off unless it was set, since hardware flow offloading keeps forwarded traffic off the CPU |
 | luci-theme-design | `themes/luci-theme-design` | `luci.mk` include path |
 
 `luci-app-airoha-npu` reads and programs the CPU PLL through `devmem`, which

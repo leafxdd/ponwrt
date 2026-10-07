@@ -1,5 +1,13 @@
 #!/bin/sh
 
+# netifd steers packets across the CPUs unless packet_steering is set. With
+# hardware flow offloading, forwarded traffic does not reach the CPU, so
+# default it to off. An explicit setting is left alone.
+if [ -z "$(uci -q get "network.@globals[0].packet_steering")" ]; then
+	uci -q set "network.@globals[0].packet_steering"="0"
+	uci -q commit "network"
+fi
+
 [ "$(uci -q get "turboacc.global.set")" -eq "1" ] && exit 0
 
 cat <<-EOF > "/etc/config/turboacc"
