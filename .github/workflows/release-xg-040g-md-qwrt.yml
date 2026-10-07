@@ -111,9 +111,14 @@ jobs:
           make defconfig
           grep -x 'CONFIG_AUTOREMOVE=y' .config
 
+      # make download carries on past a failed package download. Run
+      # package/download again so a bad source fails here, not hours into
+      # the build; it only rechecks hashes for what is already in dl/.
       - name: Download sources
         working-directory: ${{ env.BUILD_ROOT }}
-        run: make download -j"$(nproc)"
+        run: |
+          make download -j"$(nproc)"
+          make package/download -j"$(nproc)"
 
       - name: Build
         working-directory: ${{ env.BUILD_ROOT }}

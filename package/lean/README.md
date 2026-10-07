@@ -44,15 +44,18 @@ precedence over feeds, so `./scripts/feeds install -a` skips the feed copy.
 ## mihomo
 
 Copied from [fw876/helloworld](https://github.com/fw876/helloworld)
-(commit `c39f1e350105f5fc6445506f03363c5bfa44273b`) with `PKG_MIRROR_HASH`
-recomputed, and upx taken from `$(STAGING_DIR_HOSTPKG)`, where the packages
-feed installs it (Lean's tree builds upx under `tools/`).
-helloworld hashes the tarball Lean's tree generates from the git
-checkout, while PonWrt generates it with `git archive`, so helloworld's hash
-never matches here. Packages in `package/` take precedence over feeds, so
-`./scripts/feeds install -a` skips the helloworld copy.
+(commit `c39f1e350105f5fc6445506f03363c5bfa44273b`) with upx taken from
+`$(STAGING_DIR_HOSTPKG)`, where the packages feed installs it (Lean's tree
+builds upx under `tools/`). Packages in `package/` take precedence over
+feeds, so `./scripts/feeds install -a` skips the helloworld copy.
 
-To update, change `PKG_VERSION` and refresh the hash:
+There is no prebuilt source tarball on the mirrors, so the build packs one
+from a git checkout. Building as root keeps the group-write bits
+`git archive` sets, which changes the tarball, and `PKG_MIRROR_HASH` then
+fails to match. Build as a regular user, as CI does.
+
+To update, copy `PKG_VERSION` and `PKG_MIRROR_HASH` from helloworld, or
+refresh the hash as a regular user:
 
     make package/lean/mihomo/download PKG_MIRROR_HASH=skip
     make package/lean/mihomo/check FIXUP=1
