@@ -89,9 +89,13 @@ msgstr "全锥形 NAT1"
 msgid "FULLCONENAT"
 msgstr "兼容模式全锥形 NAT1"
 
-#: applications/luci-app-turboacc/htdocs/luci-static/resources/view/turboacc.js:197
+#: applications/luci-app-turboacc/htdocs/luci-static/resources/view/turboacc.js:198
 msgid "Broadcom Fullcone NAT1"
-msgstr "高性能 Broadcom 全锥形 NAT1"
+msgstr "Broadcom 全锥形 NAT1"
+
+#: applications/luci-app-turboacc/htdocs/luci-static/resources/view/turboacc.js:200
+msgid "Broadcom Fullcone NAT1 only covers IPv4 UDP, and the first connection of each UDP mapping is not flow offloaded."
+msgstr "Broadcom 全锥形 NAT1 只作用于 IPv4 UDP，且每个 UDP 映射的第一条连接不会走流量卸载。"
 
 #: applications/luci-app-turboacc/htdocs/luci-static/resources/view/turboacc.js:178
 msgid "Full cone NAT (NAT1) can improve gaming performance effectively."

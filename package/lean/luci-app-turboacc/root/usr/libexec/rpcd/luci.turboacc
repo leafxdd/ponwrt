@@ -55,6 +55,7 @@ local methods = {
 					has_mtkwed_module(boardinfo.kernel),
 				hasXTFULLCONENAT  = fs.access("/lib/modules/" .. boardinfo.kernel .. "/xt_FULLCONENAT.ko"),
 				hasNFTFULLCONENAT  = fs.access("/lib/modules/" .. boardinfo.kernel .. "/nft_fullcone.ko"),
+				hasBCMFULLCONE    = (sys.call("grep -q 'brcm_fullcone' /usr/share/ucode/fw4.uc 2>/dev/null") == 0),
 				hasTCPCCA         = readfile("/proc/sys/net/ipv4/tcp_available_congestion_control")
 			}
 			print(json.stringify(features))

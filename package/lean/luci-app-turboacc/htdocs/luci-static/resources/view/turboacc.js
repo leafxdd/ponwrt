@@ -192,9 +192,13 @@ return view.extend({
 		o = s.option(form.ListValue, 'fullcone', _('Full cone NAT'),
 			_('Full cone NAT (NAT1) can improve gaming performance effectively.'));
 		o.value('0', _('Disable'))
-		/* PonWrt firewall4 treats fullcone as a boolean, so only offer on/off. */
 		if (features.hasXTFULLCONENAT || features.hasNFTFULLCONENAT)
 			o.value('1', _('FULLCONENAT'));
+		if (features.hasBCMFULLCONE) {
+			o.value('2', _('Broadcom Fullcone NAT1'));
+			o.description += ' ' +
+				_('Broadcom Fullcone NAT1 only covers IPv4 UDP, and the first connection of each UDP mapping is not flow offloaded.');
+		}
 		o.default = '0';
 		o.rmempty = false;
 
