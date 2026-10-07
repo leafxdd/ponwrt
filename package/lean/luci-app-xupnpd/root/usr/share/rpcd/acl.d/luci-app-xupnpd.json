@@ -1,0 +1,17 @@
+{
+	"luci-app-xupnpd": {
+		"description": "Grant access to LuCI app xupnpd",
+		"read": {
+			"file": {
+				"/usr/share/xupnpd/playlists/iptv.m3u": [ "read" ]
+			},
+			"uci": [ "xupnpd" ]
+		},
+		"write": {
+			"file": {
+				"/usr/share/xupnpd/playlists/iptv.m3u": [ "write" ]
+			},
+			"uci": [ "xupnpd" ]
+		}
+	}
+}
