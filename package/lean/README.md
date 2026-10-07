@@ -8,19 +8,43 @@ LuCI packages from [coolsnowwolf/luci](https://github.com/coolsnowwolf/luci)
 
 | Package | Upstream path | Local changes |
 |---|---|---|
-| luci-app-airoha-npu | `applications/luci-app-airoha-npu` | `luci.mk` include path; dropped README screenshots |
 | luci-app-turboacc | `applications/luci-app-turboacc` | `luci.mk` include path; firewall4/nftables flow offloading only (drop iptables, fast-classifier and shortcut-fe engines); depend on `luci-lua-runtime` and `luci-lib-jsonc` for the Lua rpcd backend; detect `nft_flow_offload.ko` and `nft_fullcone.ko`; fullcone mode 2 (Broadcom) sets firewall4's `brcm_fullcone`, see below |
 | luci-theme-design | `themes/luci-theme-design` | `luci.mk` include path |
-
-`luci-app-airoha-npu` reads and programs the CPU PLL through `devmem`, which
-`configs/an7581.config` already provides (`CONFIG_KERNEL_DEVMEM` and the
-busybox `devmem` applet). An overclock only lasts until the next reboot.
 
 turboacc enables hardware flow offloading on Airoha, so the PPE forwards
 established flows without the CPU. Packet steering (Network → Interfaces →
 Global network options) stays at netifd's default, which is on. It only
 affects traffic that still goes through the CPU, such as proxies, Samba and
 other services on the router, and can be turned off there.
+
+## luci-app-airoha-npu
+
+From [rchen14b/luci-app-airoha-npu](https://github.com/rchen14b/luci-app-airoha-npu)
+(commit `14521b8414da1e98517a295d8ec267087c7dde8e`, Apache-2.0), the package
+at the top of that repository; its `luci-app-airoha-npu/` directory is an
+older copy and is not used. It replaces the copy from Lean's luci tree, which
+was based on the same project's 1.0.1. Local changes:
+
+- A `zh_Hans` translation, as upstream only ships Spanish. Strings that still
+  match keep the wording of Lean's translation.
+- `setOverclock` only accepts a plain decimal number. Upstream's range check
+  uses `test`, which fails on anything else and so lets it through: `abc`
+  then programs a PCW of 0 (0 MHz, which would stop the CPU clock) and
+  `0x5000` one for 7650 MHz. The page always sends a number, so this only
+  guards direct ubus calls.
+- Dark mode on themes without LuCI's colour tier. The page takes its colours
+  from the custom properties bootstrap exports and falls back to light ones;
+  argon and design (the default theme here) export none, so in their dark
+  mode some labels were dark on dark. When the tier is missing and the
+  background behind the view is dark, the view sets the tier itself, and the
+  poll repeats the check so a switch of the system colour scheme is
+  followed. bootstrap, and the light mode of every theme, render as upstream.
+- README without the screenshots.
+
+The page reads and programs the CPU PLL through `devmem`, which
+`configs/an7581.config` already provides (`CONFIG_KERNEL_DEVMEM` and the
+busybox `devmem` applet). An overclock lasts until the next reboot, governor
+change or thermal trip: the last two make the firmware reprogram the PLL.
 
 ## luci-app-xupnpd
 
