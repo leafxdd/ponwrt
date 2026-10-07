@@ -22,16 +22,24 @@ From [jarod360/luci-app-xupnpd](https://github.com/jarod360/luci-app-xupnpd)
 (commit `4afbcc53ae6cdde1527548172f3e502107eef539`, Apache-2.0 per its
 Makefile header), the same code QWRT ships. Local changes:
 
-- No `/etc/init.d/xupnpd` of its own: it would collide with the one the
-  xupnpd package installs, which apk refuses. `/etc/init.d/xupnpd-luci`
-  instead enables/starts or disables/stops the stock xupnpd service from
-  the `enabled` option, at boot and on every `xupnpd` config change.
+- No `/etc/init.d/xupnpd` or `/etc/config/xupnpd` of its own: they would
+  collide with the xupnpd package's files, which apk refuses. The xupnpd
+  copy below provides both and honours the `enabled` option.
 - Depend on `luci-compat` for the Lua CBI page and add an rpcd ACL.
 - Translations moved to `po/zh_Hans`, where `luci.mk` looks for them.
 - No bundled ISP-specific `iptv.m3u` and no uci-defaults script; dropped the
   unused "Broadcast for LAN Only" option. Clearing the playlist text box
   now empties the playlist, and saving it sends xupnpd SIGUSR1 so the new
   list is picked up without a restart.
+
+## xupnpd
+
+Copied from the ImmortalWrt packages feed (`multimedia/xupnpd`, commit
+`e731ba76764082d9db71de60f1ddac43f4114101`) so its init script can read
+`/etc/config/xupnpd`, which the package now ships with `enabled` off. The
+service only starts when `enabled` is set, and a reload trigger starts or
+stops it whenever the `xupnpd` config changes. Packages in `package/` take
+precedence over feeds, so `./scripts/feeds install -a` skips the feed copy.
 
 ## mihomo
 
