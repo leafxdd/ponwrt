@@ -9,12 +9,18 @@ LuCI packages from [coolsnowwolf/luci](https://github.com/coolsnowwolf/luci)
 | Package | Upstream path | Local changes |
 |---|---|---|
 | luci-app-airoha-npu | `applications/luci-app-airoha-npu` | `luci.mk` include path; dropped README screenshots |
-| luci-app-turboacc | `applications/luci-app-turboacc` | `luci.mk` include path; firewall4/nftables flow offloading only (drop iptables, fast-classifier and shortcut-fe engines); depend on `luci-lua-runtime` and `luci-lib-jsonc` for the Lua rpcd backend; detect `nft_flow_offload.ko` and `nft_fullcone.ko`; fullcone mode 2 (Broadcom) sets firewall4's `brcm_fullcone`, see below; uci-defaults turns packet steering off unless it was set, since hardware flow offloading keeps forwarded traffic off the CPU |
+| luci-app-turboacc | `applications/luci-app-turboacc` | `luci.mk` include path; firewall4/nftables flow offloading only (drop iptables, fast-classifier and shortcut-fe engines); depend on `luci-lua-runtime` and `luci-lib-jsonc` for the Lua rpcd backend; detect `nft_flow_offload.ko` and `nft_fullcone.ko`; fullcone mode 2 (Broadcom) sets firewall4's `brcm_fullcone`, see below |
 | luci-theme-design | `themes/luci-theme-design` | `luci.mk` include path |
 
 `luci-app-airoha-npu` reads and programs the CPU PLL through `devmem`, which
 `configs/an7581.config` already provides (`CONFIG_KERNEL_DEVMEM` and the
 busybox `devmem` applet). An overclock only lasts until the next reboot.
+
+turboacc enables hardware flow offloading on Airoha, so the PPE forwards
+established flows without the CPU. Packet steering (Network → Interfaces →
+Global network options) stays at netifd's default, which is on. It only
+affects traffic that still goes through the CPU, such as proxies, Samba and
+other services on the router, and can be turned off there.
 
 ## luci-app-xupnpd
 
@@ -84,3 +90,6 @@ mapping and keeps the mapping open through a conntrack expectation:
   reuse the mapping, and inbound ones, can still be offloaded.
 - With 985, a new UDP flow is dropped when the expectation table is full,
   hence the larger `nf_conntrack_expect_max`.
+
+Tested on an XG-040G-MD, and in User-Mode Linux built from the same 6.18.52
+kernel with these patches.
