@@ -12,9 +12,9 @@ LuCI packages from [coolsnowwolf/luci](https://github.com/coolsnowwolf/luci)
 | luci-app-turboacc | `applications/luci-app-turboacc` | `luci.mk` include path; firewall4/nftables flow offloading only (drop iptables, fast-classifier and shortcut-fe engines); depend on `luci-lua-runtime` and `luci-lib-jsonc` for the Lua rpcd backend; detect `nft_flow_offload.ko` and `nft_fullcone.ko`; offer fullcone as on/off because firewall4 parses it as a boolean |
 | luci-theme-design | `themes/luci-theme-design` | `luci.mk` include path |
 
-`luci-app-airoha-npu` reads and programs the CPU PLL through `devmem`. PonWrt
-builds without `CONFIG_DEVMEM` and the busybox `devmem` applet, so the page
-reports the PLL frequency as unavailable and refuses overclocking.
+`luci-app-airoha-npu` reads and programs the CPU PLL through `devmem`, which
+`configs/an7581.config` already provides (`CONFIG_KERNEL_DEVMEM` and the
+busybox `devmem` applet). An overclock only lasts until the next reboot.
 
 ## luci-app-xupnpd
 
