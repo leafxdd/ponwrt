@@ -5,7 +5,7 @@ Signed-off-by: coolsnowwolf <coolsnowwolf@gmail.com>
 
 --- a/include/statement.h
 +++ b/include/statement.h
-@@ -148,6 +148,7 @@
+@@ -148,6 +148,7 @@ struct nat_stmt {
  	uint32_t		flags;
  	uint8_t			family;
  	uint32_t		type_flags;
@@ -15,7 +15,7 @@ Signed-off-by: coolsnowwolf <coolsnowwolf@gmail.com>
  extern struct stmt *nat_stmt_alloc(const struct location *loc,
 --- a/src/json.c
 +++ b/src/json.c
-@@ -1536,6 +1536,9 @@
+@@ -1584,6 +1584,9 @@ json_t *nat_stmt_json(const struct stmt
  	json_t *root = json_object();
  	json_t *array = nat_flags_json(stmt->nat.flags);
  
@@ -27,7 +27,7 @@ Signed-off-by: coolsnowwolf <coolsnowwolf@gmail.com>
  	case NFPROTO_IPV6:
 --- a/src/netlink_delinearize.c
 +++ b/src/netlink_delinearize.c
-@@ -1488,6 +1488,8 @@
+@@ -1488,6 +1488,8 @@ static void netlink_parse_masq(struct ne
  
  	stmt = nat_stmt_alloc(loc, NFT_NAT_MASQ);
  	stmt->nat.flags = flags;
@@ -38,7 +38,7 @@ Signed-off-by: coolsnowwolf <coolsnowwolf@gmail.com>
  	if (reg1) {
 --- a/src/netlink_linearize.c
 +++ b/src/netlink_linearize.c
-@@ -1261,6 +1261,8 @@
+@@ -1271,6 +1271,8 @@ static void netlink_gen_nat_stmt(struct
  		break;
  	case NFT_NAT_MASQ:
  		nle = alloc_nft_expr("masq");
@@ -49,7 +49,7 @@ Signed-off-by: coolsnowwolf <coolsnowwolf@gmail.com>
  		nftnl_reg_pmin = NFTNL_EXPR_MASQ_REG_PROTO_MIN;
 --- a/src/parser_bison.y
 +++ b/src/parser_bison.y
-@@ -669,6 +669,10 @@
+@@ -690,6 +690,10 @@ int nft_lex(void *, void *, void *);
  %token DNAT			"dnat"
  %token MASQUERADE		"masquerade"
  %token FULLCONE		"fullcone"
@@ -60,7 +60,7 @@ Signed-off-by: coolsnowwolf <coolsnowwolf@gmail.com>
  %token REDIRECT			"redirect"
  %token RANDOM			"random"
  %token FULLY_RANDOM		"fully-random"
-@@ -4101,6 +4105,11 @@
+@@ -4161,6 +4165,11 @@ masq_stmt		:	masq_stmt_alloc		masq_stmt_
  			;
  
  masq_stmt_alloc		:	MASQUERADE	{ $$ = nat_stmt_alloc(&@$, NFT_NAT_MASQ); }
@@ -74,7 +74,7 @@ Signed-off-by: coolsnowwolf <coolsnowwolf@gmail.com>
  masq_stmt_args		:	TO 	COLON	stmt_expr
 --- a/src/parser_json.c
 +++ b/src/parser_json.c
-@@ -2313,6 +2313,16 @@
+@@ -2327,6 +2327,16 @@ static struct stmt *json_parse_nat_stmt(
  	stmt = nat_stmt_alloc(int_loc, type);
  	stmt->nat.family = familyval;
  
@@ -93,22 +93,22 @@ Signed-off-by: coolsnowwolf <coolsnowwolf@gmail.com>
  		if (!stmt->nat.addr) {
 --- a/src/scanner.l
 +++ b/src/scanner.l
-@@ -470,7 +470,11 @@
- "snat"			{ scanner_push_start_cond(yyscanner, SCANSTATE_STMT_NAT); return SNAT; }
- "dnat"			{ scanner_push_start_cond(yyscanner, SCANSTATE_STMT_NAT); return DNAT; }
- "masquerade"		{ scanner_push_start_cond(yyscanner, SCANSTATE_STMT_NAT); return MASQUERADE; }
--"fullcone"		{ scanner_push_start_cond(yyscanner, SCANSTATE_STMT_NAT); return FULLCONE; }
-+"fullcone"		{
+@@ -486,7 +486,11 @@ addrstring	({macaddr}|{ip4addr}|{ip6addr
+ <*>"snat"		{ scanner_push_start_cond(yyscanner, SCANSTATE_STMT_NAT); return SNAT; }
+ <*>"dnat"		{ scanner_push_start_cond(yyscanner, SCANSTATE_STMT_NAT); return DNAT; }
+ <*>"masquerade"		{ scanner_push_start_cond(yyscanner, SCANSTATE_STMT_NAT); return MASQUERADE; }
+-<*>"fullcone"		{ scanner_push_start_cond(yyscanner, SCANSTATE_STMT_NAT); return FULLCONE; }
++<*>"fullcone"		{
 +				if (YY_START != SCANSTATE_STMT_NAT)
 +					scanner_push_start_cond(yyscanner, SCANSTATE_STMT_NAT);
 +				return FULLCONE;
 +			}
- "redirect"		{ scanner_push_start_cond(yyscanner, SCANSTATE_STMT_NAT); return REDIRECT; }
+ <*>"redirect"		{ scanner_push_start_cond(yyscanner, SCANSTATE_STMT_NAT); return REDIRECT; }
  "random"		{ return RANDOM; }
  <SCANSTATE_STMT_NAT>{
 --- a/src/statement.c
 +++ b/src/statement.c
-@@ -691,6 +691,8 @@
+@@ -692,6 +692,8 @@ const char *nat_etype2str(enum nft_nat_e
  static void nat_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
  {
  	nft_print(octx, "%s", nat_etype2str(stmt->nat.type));
