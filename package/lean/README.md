@@ -101,7 +101,7 @@ directory:
 |---|---|
 | `target/linux/generic/hack-6.18/982-add-bcm-fullconenat-support.patch`, `983-add-bcm-fullconenat-to-nft.patch`, `985-netfilter-bcm-fullcone-reserve-expectation-early.patch` | Lean, unchanged |
 | `target/linux/generic/hack-6.18/986-netfilter-bcm-fullcone-do-not-unregister-helper.patch` | local: 982 unregisters a helper that was never registered, which crashes when `nft_masq` is unloaded |
-| `package/libs/libnftnl/patches/002-libnftnl-add-masquerade-fullcone-flag.patch`, `package/network/utils/nftables/patches/103-nftables-add-masquerade-fullcone-flag.patch`, `104-fix-fullcone-json-parsing.patch` | Lean, unchanged; 104 also fixes a crash parsing JSON `redirect` statements |
+| `package/libs/libnftnl/patches/002-libnftnl-add-masquerade-fullcone-flag.patch`, `package/network/utils/nftables/patches/103-nftables-add-masquerade-fullcone-flag.patch`, `104-fix-fullcone-json-parsing.patch` | Lean's, refreshed for libnftnl 1.3.2 and nftables 1.1.7, where 103's scanner hunk now sits on the `<*>` keyword rules; 104 also fixes a crash parsing JSON `redirect` statements |
 | `package/network/config/firewall4/patches/002-firewall4-add-brcm-fullcone-mode.patch` | Lean's, but selected with `brcm_fullcone '1'` next to `fullcone '1'` (Lean's `fullcone '2'` also works), because LuCI's firewall page shows fullcone as a checkbox and would reset `2` to off |
 | `package/kernel/linux/files/sysctl-nf-conntrack.conf` | `nf_conntrack_expect_max=16384`, as in Lean's tree |
 
@@ -116,4 +116,5 @@ mapping and keeps the mapping open through a conntrack expectation:
   hence the larger `nf_conntrack_expect_max`.
 
 Tested on an XG-040G-MD, and in User-Mode Linux built from the same 6.18.52
-kernel with these patches.
+kernel with these patches. On 6.18.55 the kernel patches apply unchanged,
+and nft 1.1.7 emits `masq fullcone 1` for `masquerade fullcone`.
