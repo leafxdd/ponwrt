@@ -5,7 +5,7 @@ Signed-off-by: coolsnowwolf <coolsnowwolf@gmail.com>
 
 --- a/src/parser_json.c
 +++ b/src/parser_json.c
-@@ -2282,12 +2282,13 @@
+@@ -2296,12 +2296,13 @@ static int nat_type_parse(const char *ty
  		[NFT_NAT_SNAT]	= "snat",
  		[NFT_NAT_DNAT]	= "dnat",
  		[NFT_NAT_MASQ]	= "masquerade",
@@ -20,7 +20,7 @@ Signed-off-by: coolsnowwolf <coolsnowwolf@gmail.com>
  			return i;
  	}
  	return -1;
-@@ -2900,6 +2901,7 @@
+@@ -2923,6 +2924,7 @@ static struct stmt *json_parse_stmt(stru
  		{ "snat", json_parse_nat_stmt },
  		{ "dnat", json_parse_nat_stmt },
  		{ "masquerade", json_parse_nat_stmt },
