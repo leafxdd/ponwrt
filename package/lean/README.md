@@ -71,6 +71,25 @@ service only starts when `enabled` is set, and a reload trigger starts or
 stops it whenever the `xupnpd` config changes. Packages in `package/` take
 precedence over feeds, so `./scripts/feeds install -a` skips the feed copy.
 
+## miniupnpd
+
+Temporary copy of the ImmortalWrt packages feed's `net/miniupnpd` (commit
+`8d50d4ea3f11eef6f8fcc889cd35ba6fcb530481`), which updated to 2.3.11 but
+kept patches written for 2.3.9 and no longer builds. Only the patches
+differ from the feed:
+
+- `020-descr-filter-fix.patch` is dropped: 2.3.11 rewrote the permission
+  line parser it replaces.
+- `030-allow-private-fix.patch` is dropped: 2.3.11 already has the fix.
+- `040-improve-logging.patch` is dropped: it only reworded log and usage
+  messages, and those lines changed in 2.3.11.
+- `010-upnp-igdv2-compat.patch` and
+  `900-miniupnpd-format-xml-to-make-some-app-happy.patch` are kept and
+  refreshed.
+
+OpenWrt's own miniupnpd 2.3.11 carries no patches. Delete this directory
+once the ImmortalWrt feed builds again.
+
 ## mihomo
 
 Copied from [fw876/helloworld](https://github.com/fw876/helloworld)
