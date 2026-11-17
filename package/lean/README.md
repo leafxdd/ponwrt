@@ -39,6 +39,12 @@ was based on the same project's 1.0.1. Local changes:
   background behind the view is dark, the view sets the tier itself, and the
   poll repeats the check so a switch of the system colour scheme is
   followed. bootstrap, and the light mode of every theme, render as upstream.
+- The NPU firmware version comes from the driver's boot message ("NPU fw
+  version"), falling back to the firmware file the DTS names, or else to the
+  driver's default for the NPU's compatible, as Lean did in coolsnowwolf/luci
+  `ff1f7d12fe3499f38762b4a6e146abbc8d02ea66`. Upstream only reads the DTS
+  `firmware-name`, which the XG-040G-MD's DTS does not set, so the page
+  showed "Unknown" there.
 - README without the screenshots.
 
 The page reads and programs the CPU PLL through `devmem`, which
