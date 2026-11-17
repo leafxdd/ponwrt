@@ -4,12 +4,12 @@ Packages from Lean's trees, or the ones QWRT ships, that the feeds PonWrt
 uses do not provide in a usable form.
 
 LuCI packages from [coolsnowwolf/luci](https://github.com/coolsnowwolf/luci)
-(branch `openwrt-25.12`, commit `2fa3f68a78e875fee86d9f9d55e38641834db225`):
+(branch `openwrt-25.12`):
 
-| Package | Upstream path | Local changes |
+| Package | Upstream path and commit | Local changes |
 |---|---|---|
-| luci-app-turboacc | `applications/luci-app-turboacc` | `luci.mk` include path; firewall4/nftables flow offloading only (drop iptables, fast-classifier and shortcut-fe engines); depend on `luci-lua-runtime` and `luci-lib-jsonc` for the Lua rpcd backend; detect `nft_flow_offload.ko` and `nft_fullcone.ko`; fullcone mode 2 (Broadcom) sets firewall4's `brcm_fullcone`, see below |
-| luci-theme-design | `themes/luci-theme-design` | `luci.mk` include path |
+| luci-app-turboacc | `applications/luci-app-turboacc` at `2fa3f68a78e875fee86d9f9d55e38641834db225`; Lean removed the app in `c27505b8d75e577a14f8af8653b6f063c551b1f8`, so this copy is kept as is | `luci.mk` include path; firewall4/nftables flow offloading only (drop iptables, fast-classifier and shortcut-fe engines); depend on `luci-lua-runtime` and `luci-lib-jsonc` for the Lua rpcd backend; detect `nft_flow_offload.ko` and `nft_fullcone.ko`; fullcone mode 2 (Broadcom) sets firewall4's `brcm_fullcone`, see below |
+| luci-theme-design | `themes/luci-theme-design` at `0a2c71f21339b644a40af6a85c428b7208f6705f` | `luci.mk` include path |
 
 turboacc enables hardware flow offloading on Airoha, so the PPE forwards
 established flows without the CPU. Packet steering (Network → Interfaces →
@@ -56,7 +56,8 @@ change or thermal trip: the last two make the firmware reprogram the PLL.
 
 From [jarod360/luci-app-xupnpd](https://github.com/jarod360/luci-app-xupnpd)
 (commit `4afbcc53ae6cdde1527548172f3e502107eef539`, Apache-2.0 per its
-Makefile header), the same code QWRT ships. Local changes:
+Makefile header), the same code QWRT ships. That repository could no longer
+be fetched in November 2026, so this copy is the reference. Local changes:
 
 - No `/etc/init.d/xupnpd` or `/etc/config/xupnpd` of its own: they would
   collide with the xupnpd package's files, which apk refuses. The xupnpd
