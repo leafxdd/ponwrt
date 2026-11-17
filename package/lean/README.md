@@ -81,10 +81,19 @@ precedence over feeds, so `./scripts/feeds install -a` skips the feed copy.
 ## mihomo
 
 Copied from [fw876/helloworld](https://github.com/fw876/helloworld)
-(commit `c39f1e350105f5fc6445506f03363c5bfa44273b`) with upx taken from
-`$(STAGING_DIR_HOSTPKG)`, where the packages feed installs it (Lean's tree
-builds upx under `tools/`). Packages in `package/` take precedence over
-feeds, so `./scripts/feeds install -a` skips the helloworld copy.
+(commit `c9525e69126d38eb9f117f2448a58678aa4eec7c`, mihomo 1.19.33) with upx
+taken from `$(STAGING_DIR_HOSTPKG)`, where the packages feed installs it
+(Lean's tree builds upx under `tools/`). Packages in `package/` take
+precedence over feeds, so `./scripts/feeds install -a` skips the helloworld
+copy.
+
+helloworld's copy carries Lean's AN7581 EIP93 patch (`patches/` and
+`README.eip93.md`, both unchanged): arm64 builds compile Go's AES-GCM with a
+private overlay that hands AES-CTR to the EIP93 engine through AF_ALG and
+falls back to software whenever that fails. It needs the EIP93 driver and
+the AF_ALG, GCM, GHASH and CTR modules, which `configs/xg-040g-md-qwrt.config`
+selects; QWRT's `kmod-crypto-hw-airoha-eip93` is `kmod-crypto-hw-eip93`
+here. Set `MIHOMO_EIP93=off` in mihomo's environment to turn it off.
 
 There is no prebuilt source tarball on the mirrors, so the build packs one
 from a git checkout. Building as root keeps the group-write bits
