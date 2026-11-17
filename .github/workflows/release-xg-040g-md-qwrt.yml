@@ -1,4 +1,5 @@
-name: Release XG-040G-MD (QWRT feature set)
+name: Release AN7581 (QWRT feature set)
+run-name: Release AN7581 QWRT ${{ inputs.tag }}
 
 on:
   workflow_dispatch:
@@ -141,7 +142,19 @@ jobs:
         run: |
           out=bin/targets/airoha/an7581
           mkdir -p "$GITHUB_WORKSPACE/release"
-          cp "$out"/*nokia_xg-040g-md-ubi*.itb "$GITHUB_WORKSPACE/release/"
+          # Fail if any device in configs/xg-040g-md-qwrt.config lost an image.
+          shopt -s nullglob
+          for dev in nokia_xg-040g-md-ubi nokia_xg-040g-tf-ubi fiberhome_hg5585f-ct; do
+            for img in squashfs-sysupgrade.itb initramfs-recovery.itb; do
+              files=("$out"/*-"$dev"-"$img")
+              if [ "${#files[@]}" -ne 1 ]; then
+                echo "::error::expected one $dev $img, found ${#files[@]}"
+                exit 1
+              fi
+              cp "${files[0]}" "$GITHUB_WORKSPACE/release/"
+            done
+          done
+          shopt -u nullglob
           cp "$out"/*.manifest "$GITHUB_WORKSPACE/release/" 2>/dev/null || true
           cp "$out"/config.buildinfo "$GITHUB_WORKSPACE/release/"
           cd "$GITHUB_WORKSPACE/release"
@@ -160,8 +173,8 @@ jobs:
             release/*
             --repo "$GITHUB_REPOSITORY"
             --target "$GITHUB_SHA"
-            --title "PonWrt $RELEASE_TAG (Nokia XG-040G-MD, QWRT feature set)"
-            --notes "Nokia XG-040G-MD (UBI) firmware built from configs/an7581.config, configs/release.config and configs/xg-040g-md-qwrt.config at $GITHUB_SHA. Back up the bosa and ri UBI volumes before flashing."
+            --title "PonWrt $RELEASE_TAG (Nokia XG-040G-MD/TF, FiberHome HG5585F CT, QWRT feature set)"
+            --notes "Nokia XG-040G-MD (UBI), Nokia XG-040G-TF (UBI) and FiberHome HG5585F CT firmware built from configs/an7581.config, configs/release.config and configs/xg-040g-md-qwrt.config at $GITHUB_SHA. Before flashing, back up the bosa and ri UBI volumes on the Nokia models and the factory UBI volume on the HG5585F CT."
           )
           if [ "$PRERELEASE" = "true" ]; then
             args+=(--prerelease)
