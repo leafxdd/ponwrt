@@ -4,12 +4,12 @@ Packages from Lean's trees, or the ones QWRT ships, that the feeds PonWrt
 uses do not provide in a usable form.
 
 LuCI packages from [coolsnowwolf/luci](https://github.com/coolsnowwolf/luci)
-(branch `openwrt-25.12`, commit `2fa3f68a78e875fee86d9f9d55e38641834db225`):
+(branch `openwrt-25.12`):
 
-| Package | Upstream path | Local changes |
+| Package | Upstream path and commit | Local changes |
 |---|---|---|
-| luci-app-turboacc | `applications/luci-app-turboacc` | `luci.mk` include path; firewall4/nftables flow offloading only (drop iptables, fast-classifier and shortcut-fe engines); depend on `luci-lua-runtime` and `luci-lib-jsonc` for the Lua rpcd backend; detect `nft_flow_offload.ko` and `nft_fullcone.ko`; fullcone mode 2 (Broadcom) sets firewall4's `brcm_fullcone`, see below |
-| luci-theme-design | `themes/luci-theme-design` | `luci.mk` include path |
+| luci-app-turboacc | `applications/luci-app-turboacc` at `2fa3f68a78e875fee86d9f9d55e38641834db225`; Lean removed the app in `c27505b8d75e577a14f8af8653b6f063c551b1f8`, so this copy is kept as is | `luci.mk` include path; firewall4/nftables flow offloading only (drop iptables, fast-classifier and shortcut-fe engines); depend on `luci-lua-runtime` and `luci-lib-jsonc` for the Lua rpcd backend; detect `nft_flow_offload.ko` and `nft_fullcone.ko`; fullcone mode 2 (Broadcom) sets firewall4's `brcm_fullcone`, see below |
+| luci-theme-design | `themes/luci-theme-design` at `0a2c71f21339b644a40af6a85c428b7208f6705f` | `luci.mk` include path |
 
 turboacc enables hardware flow offloading on Airoha, so the PPE forwards
 established flows without the CPU. Packet steering (Network → Interfaces →
@@ -39,6 +39,12 @@ was based on the same project's 1.0.1. Local changes:
   background behind the view is dark, the view sets the tier itself, and the
   poll repeats the check so a switch of the system colour scheme is
   followed. bootstrap, and the light mode of every theme, render as upstream.
+- The NPU firmware version comes from the driver's boot message ("NPU fw
+  version"), falling back to the firmware file the DTS names, or else to the
+  driver's default for the NPU's compatible, as Lean did in coolsnowwolf/luci
+  `ff1f7d12fe3499f38762b4a6e146abbc8d02ea66`. Upstream only reads the DTS
+  `firmware-name`, which the XG-040G-MD's DTS does not set, so the page
+  showed "Unknown" there.
 - README without the screenshots.
 
 The page reads and programs the CPU PLL through `devmem`, which
@@ -50,7 +56,8 @@ change or thermal trip: the last two make the firmware reprogram the PLL.
 
 From [jarod360/luci-app-xupnpd](https://github.com/jarod360/luci-app-xupnpd)
 (commit `4afbcc53ae6cdde1527548172f3e502107eef539`, Apache-2.0 per its
-Makefile header), the same code QWRT ships. Local changes:
+Makefile header), the same code QWRT ships. That repository could no longer
+be fetched in November 2026, so this copy is the reference. Local changes:
 
 - No `/etc/init.d/xupnpd` or `/etc/config/xupnpd` of its own: they would
   collide with the xupnpd package's files, which apk refuses. The xupnpd
@@ -71,32 +78,22 @@ service only starts when `enabled` is set, and a reload trigger starts or
 stops it whenever the `xupnpd` config changes. Packages in `package/` take
 precedence over feeds, so `./scripts/feeds install -a` skips the feed copy.
 
-## miniupnpd
-
-Temporary copy of the ImmortalWrt packages feed's `net/miniupnpd` (commit
-`8d50d4ea3f11eef6f8fcc889cd35ba6fcb530481`), which updated to 2.3.11 but
-kept patches written for 2.3.9 and no longer builds. Only the patches
-differ from the feed:
-
-- `020-descr-filter-fix.patch` is dropped: 2.3.11 rewrote the permission
-  line parser it replaces.
-- `030-allow-private-fix.patch` is dropped: 2.3.11 already has the fix.
-- `040-improve-logging.patch` is dropped: it only reworded log and usage
-  messages, and those lines changed in 2.3.11.
-- `010-upnp-igdv2-compat.patch` and
-  `900-miniupnpd-format-xml-to-make-some-app-happy.patch` are kept and
-  refreshed.
-
-OpenWrt's own miniupnpd 2.3.11 carries no patches. Delete this directory
-once the ImmortalWrt feed builds again.
-
 ## mihomo
 
 Copied from [fw876/helloworld](https://github.com/fw876/helloworld)
-(commit `c39f1e350105f5fc6445506f03363c5bfa44273b`) with upx taken from
-`$(STAGING_DIR_HOSTPKG)`, where the packages feed installs it (Lean's tree
-builds upx under `tools/`). Packages in `package/` take precedence over
-feeds, so `./scripts/feeds install -a` skips the helloworld copy.
+(commit `c9525e69126d38eb9f117f2448a58678aa4eec7c`, mihomo 1.19.33) with upx
+taken from `$(STAGING_DIR_HOSTPKG)`, where the packages feed installs it
+(Lean's tree builds upx under `tools/`). Packages in `package/` take
+precedence over feeds, so `./scripts/feeds install -a` skips the helloworld
+copy.
+
+helloworld's copy carries Lean's AN7581 EIP93 patch (`patches/` and
+`README.eip93.md`, both unchanged): arm64 builds compile Go's AES-GCM with a
+private overlay that hands AES-CTR to the EIP93 engine through AF_ALG and
+falls back to software whenever that fails. It needs the EIP93 driver and
+the AF_ALG, GCM, GHASH and CTR modules, which `configs/xg-040g-md-qwrt.config`
+selects; QWRT's `kmod-crypto-hw-airoha-eip93` is `kmod-crypto-hw-eip93`
+here. Set `MIHOMO_EIP93=off` in mihomo's environment to turn it off.
 
 There is no prebuilt source tarball on the mirrors, so the build packs one
 from a git checkout. Building as root keeps the group-write bits
