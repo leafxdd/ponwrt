@@ -1,0 +1,313 @@
+From: PonWrt
+Subject: [PATCH] oam: report the CTC ONU SN layout again
+
+Upstream 10f4a9e and a903fcc replaced the ONU SN attribute (branch 0xC7,
+leaf 0x0001) with the 8-byte ONU serial number, which was tested against
+one Huawei OLT. The CTC layout is vendor ID (4), ONU model (4), ONU ID
+(the MAC address, 6), hardware version (8) and software version (16),
+plus the extended ONU model (16) from CTC 3.0 on, as before.
+
+On a China Telecom 10G-EPON line, a FiberHome HG5585F CT registers with
+the seller's firmware, whose agent predates 10f4a9e and so sends the CTC
+layout. With the 8-byte version the same unit registers and is then
+deregistered and denied, as is a Nokia XG-040G-TF. The ONU SN is the
+likeliest difference; this is not confirmed yet.
+
+- Report the CTC layout again. `option onu_sn_format 'serial'` in the
+  oam section keeps the 8-byte serial number for OLTs that want it.
+- An unset vendor ID follows the vendor bytes of the serial number the
+  line registers with, instead of OWRT. A configured one still wins.
+- Read the active serial number for every OAMPDU instead of once at
+  start: the driver latches it when pon0 opens, which is after this agent
+  starts (START=19, network at 20), so the first read is usually "none"
+  and the ONU SN then carried OWRT and part of the MAC address. A change
+  is logged as an "identity" event.
+---
+diff -ruN a/src/oam/config.rs b/src/oam/config.rs
+--- a/src/oam/config.rs
++++ b/src/oam/config.rs
+@@ -4,12 +4,28 @@
+ 
+ use crate::config::Section;
+ 
++/// How the CTC ONU SN attribute (branch 0xC7, leaf 0x0001) is encoded.
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub enum OnuSnFormat {
++    /// The CTC layout: vendor ID (4), ONU model (4), ONU ID, which is the MAC
++    /// address (6), hardware version (8) and software version (16), followed
++    /// from CTC 3.0 on by the extended ONU model (16).
++    Ctc,
++    /// The 8-byte ONU serial number alone, which a Huawei OLT was reported to
++    /// accept where it rejected the CTC layout.
++    Serial,
++}
++
+ #[derive(Clone, Debug)]
+ pub struct OamConfig {
+     pub operator: String,
+     pub ctc_oui: [u8; 3],
+     pub ctc_versions: Vec<u8>,
+     pub vendor_id: Vec<u8>,
++    /// Whether `vendor_id` was set in the configuration. An unset vendor ID
++    /// follows the serial number the line registers with.
++    pub vendor_id_configured: bool,
++    pub onu_sn_format: OnuSnFormat,
+     pub model: Vec<u8>,
+     pub equipment_id: Vec<u8>,
+     pub hardware_version: Vec<u8>,
+@@ -29,6 +45,8 @@
+             ctc_oui: [0x11, 0x11, 0x11],
+             ctc_versions: vec![0x21, 0x30],
+             vendor_id: b"OWRT".to_vec(),
++            vendor_id_configured: false,
++            onu_sn_format: OnuSnFormat::Ctc,
+             model: b"AN75".to_vec(),
+             equipment_id: b"AN75".to_vec(),
+             hardware_version: b"AN7581".to_vec(),
+@@ -75,6 +93,24 @@
+                 *destination = value.as_bytes().to_vec();
+             }
+         }
++        config.vendor_id_configured = section
++            .option("vendor_id")
++            .is_some_and(|value| !value.is_empty());
++        if let Some(value) = section
++            .option("onu_sn_format")
++            .filter(|value| !value.is_empty())
++        {
++            config.onu_sn_format = match value {
++                "ctc" => OnuSnFormat::Ctc,
++                "serial" => OnuSnFormat::Serial,
++                _ => {
++                    return Err(io::Error::new(
++                        io::ErrorKind::InvalidData,
++                        "onu_sn_format must be ctc or serial",
++                    ))
++                }
++            };
++        }
+         if let Some(value) = section
+             .option("chipset_id")
+             .filter(|value| !value.is_empty())
+@@ -122,6 +158,30 @@
+         serial[4..].copy_from_slice(&source_mac[2..]);
+         serial
+     }
++
++    /// The vendor code reported to the OLT: the configured vendor ID, else the
++    /// vendor bytes of the serial number the line registers with, else the
++    /// default.
++    pub fn vendor(&self) -> Vec<u8> {
++        match self.active_serial_number {
++            Some(serial) if !self.vendor_id_configured => serial[..4].to_vec(),
++            _ => fixed_width(&self.vendor_id, 4),
++        }
++    }
++
++    /// The CTC ONU SN attribute, see `OnuSnFormat::Ctc`. `extended` adds the
++    /// extended ONU model that CTC 3.0 appends.
++    pub fn ctc_onu_sn(&self, source_mac: [u8; 6], extended: bool) -> Vec<u8> {
++        let mut value = self.vendor();
++        value.extend_from_slice(&fixed_width(&self.model, 4));
++        value.extend_from_slice(&source_mac);
++        value.extend_from_slice(&fixed_width(&self.hardware_version, 8));
++        value.extend_from_slice(&fixed_width(&self.software_version, 16));
++        if extended {
++            value.extend_from_slice(&fixed_width(&self.equipment_id, 16));
++        }
++        value
++    }
+ }
+ 
+ pub fn fixed_width(value: &[u8], width: usize) -> Vec<u8> {
+@@ -262,4 +322,75 @@
+             *b"OWRT\x22\x33\x44\x55"
+         );
+     }
++
++    fn parse_oam(options: &str) -> io::Result<OamConfig> {
++        let config = PonConfig::parse(&format!(
++            "config oam 'line0_oam'\n\toption line 'line0'\n{options}"
++        ))
++        .unwrap();
++        OamConfig::from_section(config.linked_section("oam", "line0").unwrap())
++    }
++
++    #[test]
++    fn onu_sn_uses_the_ctc_layout_by_default() {
++        let mut config = parse_oam(
++            "\toption model 'XG04'\n\
++             \toption hardware_version 'HW1'\n\
++             \toption software_version 'SW1.2'\n\
++             \toption equipment_id 'XG-040G-TF'\n",
++        )
++        .unwrap();
++        config.active_serial_number = Some(*b"ALCL\x12\x34\x56\x78");
++        let mac = [0x02, 0x11, 0x22, 0x33, 0x44, 0x55];
++
++        assert_eq!(config.onu_sn_format, OnuSnFormat::Ctc);
++
++        let v21 = config.ctc_onu_sn(mac, false);
++        assert_eq!(v21.len(), 38);
++        assert_eq!(&v21[..4], b"ALCL");
++        assert_eq!(&v21[4..8], b"XG04");
++        assert_eq!(&v21[8..14], &mac);
++        assert_eq!(&v21[14..22], b"HW1\0\0\0\0\0");
++        assert_eq!(&v21[22..38], b"SW1.2\0\0\0\0\0\0\0\0\0\0\0");
++
++        let v30 = config.ctc_onu_sn(mac, true);
++        assert_eq!(v30.len(), 54);
++        assert_eq!(&v30[..38], &v21[..]);
++        assert_eq!(&v30[38..], b"XG-040G-TF\0\0\0\0\0\0");
++    }
++
++    #[test]
++    fn an_unset_vendor_id_follows_the_serial_number() {
++        let mut config = parse_oam("\toption vendor_id ''\n").unwrap();
++
++        assert_eq!(config.vendor(), b"OWRT");
++        config.active_serial_number = Some(*b"ZTEG\x10\x50\x2e\x88");
++        assert_eq!(config.vendor(), b"ZTEG");
++    }
++
++    #[test]
++    fn a_configured_vendor_id_wins_over_the_serial_number() {
++        let mut config = parse_oam("\toption vendor_id 'ABCD'\n").unwrap();
++        config.active_serial_number = Some(*b"ZTEG\x10\x50\x2e\x88");
++
++        assert_eq!(config.vendor(), b"ABCD");
++        assert_eq!(&config.ctc_onu_sn([0; 6], false)[..4], b"ABCD");
++    }
++
++    #[test]
++    fn onu_sn_format_selects_the_serial_number() {
++        assert_eq!(
++            parse_oam("\toption onu_sn_format 'serial'\n")
++                .unwrap()
++                .onu_sn_format,
++            OnuSnFormat::Serial
++        );
++        assert_eq!(
++            parse_oam("\toption onu_sn_format 'ctc'\n")
++                .unwrap()
++                .onu_sn_format,
++            OnuSnFormat::Ctc
++        );
++        assert!(parse_oam("\toption onu_sn_format 'huawei'\n").is_err());
++    }
+ }
+diff -ruN a/src/oam/ctc.rs b/src/oam/ctc.rs
+--- a/src/oam/ctc.rs
++++ b/src/oam/ctc.rs
+@@ -2,7 +2,7 @@
+ 
+ use std::collections::BTreeSet;
+ 
+-use super::config::{fixed_width, fixed_width_right, OamConfig};
++use super::config::{fixed_width, fixed_width_right, OamConfig, OnuSnFormat};
+ use crate::wire::{Reader, Writer};
+ 
+ const INFO_TYPE_ORGANIZATION_SPECIFIC: u8 = 0xfe;
+@@ -468,7 +468,12 @@
+         }
+ 
+         match leaf {
+-            LEAF_ONU_SN if object.is_none() => Ok(config.onu_serial(source_mac).to_vec()),
++            LEAF_ONU_SN if object.is_none() => Ok(match config.onu_sn_format {
++                OnuSnFormat::Ctc => {
++                    config.ctc_onu_sn(source_mac, self.selected_version.unwrap_or(0) >= 0x30)
++                }
++                OnuSnFormat::Serial => config.onu_serial(source_mac).to_vec(),
++            }),
+             LEAF_FIRMWARE_VERSION if object.is_none() => {
+                 Ok(config.firmware_version.iter().copied().take(127).collect())
+             }
+@@ -706,4 +711,33 @@
+         );
+         assert_eq!(session.unsupported_requests, 1);
+     }
++
++    #[test]
++    fn onu_sn_follows_the_negotiated_ctc_version() {
++        let mut config = OamConfig::default();
++        config.active_serial_number = Some(*b"ALCL\x12\x34\x56\x78");
++        let mac = [0x02, 0x11, 0x22, 0x33, 0x44, 0x55];
++        let mut session = CtcSession::new();
++
++        session.selected_version = Some(0x21);
++        let v21 = session
++            .get_value(EXTENDED_ATTRIBUTE, LEAF_ONU_SN, None, &config, mac)
++            .unwrap();
++        assert_eq!(v21, config.ctc_onu_sn(mac, false));
++        assert_eq!(v21.len(), 38);
++
++        session.selected_version = Some(0x30);
++        let v30 = session
++            .get_value(EXTENDED_ATTRIBUTE, LEAF_ONU_SN, None, &config, mac)
++            .unwrap();
++        assert_eq!(v30.len(), 54);
++
++        config.onu_sn_format = OnuSnFormat::Serial;
++        assert_eq!(
++            session
++                .get_value(EXTENDED_ATTRIBUTE, LEAF_ONU_SN, None, &config, mac)
++                .unwrap(),
++            b"ALCL\x12\x34\x56\x78"
++        );
++    }
+ }
+diff -ruN a/src/oam/mod.rs b/src/oam/mod.rs
+--- a/src/oam/mod.rs
++++ b/src/oam/mod.rs
+@@ -33,7 +33,6 @@
+     control_socket: &Path,
+ ) -> io::Result<()> {
+     let source_mac = parent_interface_mac(interface)?;
+-    config.active_serial_number = active_serial_number(interface)?;
+     let socket = PacketSocket::open(interface)?;
+     let service_ready = parent_xpon_attribute(interface, "service_ready")?;
+     publish_service_ready(service_ready.as_deref(), false);
+@@ -78,6 +77,9 @@
+             }
+         };
+         status.record_rx(pdu.code);
++        // The driver latches the serial number when pon0 opens, which is
++        // usually after this agent starts, so it is read for every OAMPDU.
++        refresh_active_serial(interface, &mut config, &status);
+ 
+         let response = match pdu.code {
+             CODE_INFORMATION => {
+@@ -158,6 +160,33 @@
+     }
+ }
+ 
++/// Pick up the serial number the line currently registers with, so the ONU SN
++/// carries it and an unset vendor ID follows it. A failed read keeps the last
++/// value.
++fn refresh_active_serial(interface: &str, config: &mut OamConfig, status: &StatusHub) {
++    let serial = match active_serial_number(interface) {
++        Ok(serial) => serial,
++        Err(_) => return,
++    };
++    if serial == config.active_serial_number {
++        return;
++    }
++    config.active_serial_number = serial;
++    let message = match serial {
++        Some(serial) => format!(
++            "ONU serial {}{:02X}{:02X}{:02X}{:02X}, vendor {}",
++            String::from_utf8_lossy(&serial[..4]),
++            serial[4],
++            serial[5],
++            serial[6],
++            serial[7],
++            String::from_utf8_lossy(&config.vendor()),
++        ),
++        None => "ONU serial cleared".to_owned(),
++    };
++    status.record_event("identity", message);
++}
++
+ fn active_serial_number(interface: &str) -> io::Result<Option<[u8; 8]>> {
+     let Some(path) = parent_xpon_attribute(interface, "active_serial_number")? else {
+         return Ok(None);

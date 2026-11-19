@@ -1,0 +1,16 @@
+#!/bin/sh
+# Point OpenClash's Meta core at this mihomo, which carries the AN7581 EIP93
+# AES-GCM path, unless a core is already there. OpenClash replaces the link
+# with its own download when its core is updated.
+
+core=/etc/openclash/core/clash_meta
+
+[ -x /usr/bin/mihomo ] || exit 0
+[ -f /etc/init.d/openclash ] || exit 0
+if [ -e "$core" ] || [ -L "$core" ]; then
+	exit 0
+fi
+
+mkdir -p /etc/openclash/core
+ln -s /usr/bin/mihomo "$core"
+exit 0
