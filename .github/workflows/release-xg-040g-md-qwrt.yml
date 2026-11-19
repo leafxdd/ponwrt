@@ -85,6 +85,7 @@ jobs:
         working-directory: ${{ env.BUILD_ROOT }}
         run: |
           ./scripts/feeds update -a
+          ./feed-patches/apply.sh
           ./scripts/feeds install -a
 
       - name: Load repository signing key
