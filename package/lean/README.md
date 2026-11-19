@@ -95,6 +95,15 @@ the AF_ALG, GCM, GHASH and CTR modules, which `configs/xg-040g-md-qwrt.config`
 selects; QWRT's `kmod-crypto-hw-airoha-eip93` is `kmod-crypto-hw-eip93`
 here. Set `MIHOMO_EIP93=off` in mihomo's environment to turn it off.
 
+SSR-Plus runs `/usr/bin/mihomo` itself. OpenClash runs
+`/etc/openclash/core/clash_meta`, normally its own download without the
+EIP93 path, so a first-boot script (`files/openclash-core.defaults`, a
+local addition) links that path to `/usr/bin/mihomo` when OpenClash is
+installed and no core is there yet. Updating the core from OpenClash
+replaces the link with the download; `ln -sf /usr/bin/mihomo
+/etc/openclash/core/clash_meta` restores it. The Smart core type needs
+OpenClash's own core.
+
 There is no prebuilt source tarball on the mirrors, so the build packs one
 from a git checkout. Building as root keeps the group-write bits
 `git archive` sets, which changes the tarball, and `PKG_MIRROR_HASH` then
