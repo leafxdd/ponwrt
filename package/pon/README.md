@@ -33,7 +33,8 @@ The CTC layout is what the agent sent before November, and what the
 naoki66/OpenWrt_ONU_CONFIG fork and faadd2's ZN504XG-D builds still send.
 On a China Telecom 10G-EPON line a FiberHome HG5585F CT registered with
 such a build but was deregistered and denied with upstream's, and so was a
-Nokia XG-040G-TF. Whether this patch is what fixes that is not confirmed.
+Nokia XG-040G-TF. With this patch the line registers and PPPoE comes up
+(tested November 2026).
 
 To update, copy the package from the feed again and refresh the patch:
 
