@@ -1,0 +1,20 @@
+From: PonWrt
+Subject: [PATCH] luci-base: raise the request field limit to 10 MB
+
+LuCI rejects a form whose fields hold more than 100 kB each. OpenClash's
+config file page carries the whole config twice in text areas, so with a
+config over 100 kB every Apply on that page fails with "the value exceeds
+the maximum allow size". 10 MB fits large subscription configs and is
+still small next to the memory of the routers this targets.
+---
+--- a/modules/luci-base/ucode/http.uc
++++ b/modules/luci-base/ucode/http.uc
+@@ -20,7 +20,7 @@
+ import { run_plugins } from 'luciplugins';
+ 
+ // luci.http module scope
+-export let HTTP_MAX_CONTENT = 1024*100;		// 100 kB maximum content size
++export let HTTP_MAX_CONTENT = 1024*1024*10;	// 10 MB maximum content size
+ 
+ // Decode a mime encoded http message body with multipart/form-data
+ // Content-Type. Stores all extracted data associated with its parameter name
